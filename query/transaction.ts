@@ -511,7 +511,6 @@ export class Transaction {
       return (await this.#executeQuery(query)) as QueryArrayResult<T>;
     } catch (e) {
       if (e instanceof PostgresError || e instanceof Deno.errors.BrokenPipe) {
-        await this.commit();
         throw new TransactionError(this.name, e);
       }
       throw e;
@@ -613,7 +612,6 @@ export class Transaction {
       return (await this.#executeQuery(query)) as QueryObjectResult<T>;
     } catch (e) {
       if (e instanceof PostgresError || e instanceof Deno.errors.BrokenPipe) {
-        await this.commit();
         throw new TransactionError(this.name, e);
       }
       throw e;
@@ -757,7 +755,6 @@ export class Transaction {
       await this.queryArray(`ROLLBACK ${chain_option ? "AND CHAIN" : ""}`);
     } catch (e) {
       if (e instanceof PostgresError || e instanceof Deno.errors.BrokenPipe) {
-        await this.commit();
         throw new TransactionError(this.name, e);
       }
       throw e;
@@ -856,7 +853,6 @@ export class Transaction {
         await savepoint.update();
       } catch (e) {
         if (e instanceof PostgresError || e instanceof Deno.errors.BrokenPipe) {
-          await this.commit();
           throw new TransactionError(this.name, e);
         }
         throw e;
@@ -876,7 +872,6 @@ export class Transaction {
         await savepoint.update();
       } catch (e) {
         if (e instanceof PostgresError || e instanceof Deno.errors.BrokenPipe) {
-          await this.commit();
           throw new TransactionError(this.name, e);
         }
         throw e;
