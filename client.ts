@@ -231,8 +231,14 @@ export abstract class QueryClient {
       name,
       options,
       this,
-      // Bind context so function can be passed as is
-      this.#executeQuery.bind(this),
+      // Pass in callback to lower-level connection, to avoid our retry logic
+      // for non-transactional queries
+      this.#connection.query.bind(this.#connection),
+      // Lower-level reconnect callback to handle dropped connections in `.begin()`
+      async () => {
+        await this.closeConnection();
+        await this.connect();
+      },
       (name: string | null) => {
         this.#transaction = name;
       },

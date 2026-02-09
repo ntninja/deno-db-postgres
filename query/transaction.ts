@@ -152,6 +152,7 @@ export class Savepoint {
 export class Transaction {
   #client: QueryClient;
   #executeQuery: (query: Query<ResultType>) => Promise<QueryResult>;
+  #reconnectClient: () => Promise<void>;
   /** The isolation level of the transaction */
   #isolation_level: IsolationLevel;
   #read_only: boolean;
@@ -168,13 +169,15 @@ export class Transaction {
     options: TransactionOptions | undefined,
     client: QueryClient,
     execute_query_callback: (query: Query<ResultType>) => Promise<QueryResult>,
+    reconnect_client_callback: () => Promise<void>,
     update_client_lock_callback: (name: string | null) => void,
   ) {
     this.#client = client;
-    this.#executeQuery = execute_query_callback;
     this.#isolation_level = options?.isolation_level ?? "read_committed";
     this.#read_only = options?.read_only ?? false;
     this.#snapshot = options?.snapshot;
+    this.#executeQuery = execute_query_callback;
+    this.#reconnectClient = reconnect_client_callback;
     this.#updateClientLock = update_client_lock_callback;
   }
 
@@ -270,10 +273,18 @@ export class Transaction {
         `BEGIN ${permissions} ISOLATION LEVEL ${isolation_level};${snapshot}`,
       );
     } catch (e) {
-      if (e instanceof PostgresError) {
-        throw new TransactionError(this.name, e);
+      if (e instanceof Deno.errors.BrokenPipe) {
+        // Retry with fresh connection, if connection was dropped by server since last query
+        await this.#reconnectClient();
+        await this.#client.queryArray(
+          `BEGIN ${permissions} ISOLATION LEVEL ${isolation_level};${snapshot}`,
+        );
+      } else {
+        if (e instanceof PostgresError) {
+          throw new TransactionError(this.name, e);
+        }
+        throw e;
       }
-      throw e;
     }
 
     this.#updateClientLock(this.name);
