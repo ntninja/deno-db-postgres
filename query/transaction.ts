@@ -279,10 +279,9 @@ export class Transaction {
         await this.#client.queryArray(
           `BEGIN ${permissions} ISOLATION LEVEL ${isolation_level};${snapshot}`,
         );
+      } else if (e instanceof PostgresError) {
+        throw new TransactionError(this.name, e);
       } else {
-        if (e instanceof PostgresError) {
-          throw new TransactionError(this.name, e);
-        }
         throw e;
       }
     }
@@ -333,16 +332,9 @@ export class Transaction {
     const chain = options?.chain ?? false;
 
     if (!this.#committed) {
-      try {
-        await this.queryArray(`COMMIT ${chain ? "AND CHAIN" : ""}`);
-        if (!chain) {
-          this.#committed = true;
-        }
-      } catch (e) {
-        if (e instanceof PostgresError) {
-          throw new TransactionError(this.name, e);
-        }
-        throw e;
+      await this.queryArray(`COMMIT ${chain ? "AND CHAIN" : ""}`);
+      if (!chain) {
+        this.#committed = true;
       }
     }
 
@@ -513,7 +505,12 @@ export class Transaction {
       return (await this.#executeQuery(query)) as QueryArrayResult<T>;
     } catch (e) {
       if (e instanceof PostgresError) {
-        await this.commit();
+        await this.rollback();
+        throw new TransactionError(this.name, e);
+      } else if (e instanceof Deno.errors.BrokenPipe) {
+        // Transaction was already rolled back by PostgreSQL on disconnect
+        this.#resetTransaction();
+        this.#updateClientLock(null);
         throw new TransactionError(this.name, e);
       }
       throw e;
@@ -615,7 +612,12 @@ export class Transaction {
       return (await this.#executeQuery(query)) as QueryObjectResult<T>;
     } catch (e) {
       if (e instanceof PostgresError) {
-        await this.commit();
+        await this.rollback();
+        throw new TransactionError(this.name, e);
+      } else if (e instanceof Deno.errors.BrokenPipe) {
+        // Transaction was already rolled back by PostgreSQL on disconnect
+        this.#resetTransaction();
+        this.#updateClientLock(null);
         throw new TransactionError(this.name, e);
       }
       throw e;
@@ -755,15 +757,7 @@ export class Transaction {
 
     // If no savepoint is provided, rollback the whole transaction and check for the chain operator
     // in order to decide whether to restart the transaction or end it
-    try {
-      await this.queryArray(`ROLLBACK ${chain_option ? "AND CHAIN" : ""}`);
-    } catch (e) {
-      if (e instanceof PostgresError) {
-        await this.commit();
-        throw new TransactionError(this.name, e);
-      }
-      throw e;
-    }
+    await this.queryArray(`ROLLBACK ${chain_option ? "AND CHAIN" : ""}`);
 
     this.#resetTransaction();
     if (!chain_option) {
@@ -857,8 +851,7 @@ export class Transaction {
       try {
         await savepoint.update();
       } catch (e) {
-        if (e instanceof PostgresError) {
-          await this.commit();
+        if (e instanceof PostgresError || e instanceof Deno.errors.BrokenPipe) {
           throw new TransactionError(this.name, e);
         }
         throw e;
@@ -874,15 +867,7 @@ export class Transaction {
         },
       );
 
-      try {
-        await savepoint.update();
-      } catch (e) {
-        if (e instanceof PostgresError) {
-          await this.commit();
-          throw new TransactionError(this.name, e);
-        }
-        throw e;
-      }
+      await savepoint.update();
       this.#savepoints.push(savepoint);
     }
 
