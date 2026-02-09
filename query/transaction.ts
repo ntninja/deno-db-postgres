@@ -270,10 +270,19 @@ export class Transaction {
         `BEGIN ${permissions} ISOLATION LEVEL ${isolation_level};${snapshot}`,
       );
     } catch (e) {
-      if (e instanceof PostgresError) {
-        throw new TransactionError(this.name, e);
+      if (e instanceof Deno.errors.BrokenPipe) {
+        // Retry with fresh connection, if connection was dropped by server since last query
+        await this.#client.closeConnection();
+        await this.#client.connect();
+        await this.#client.queryArray(
+          `BEGIN ${permissions} ISOLATION LEVEL ${isolation_level};${snapshot}`,
+        );
+      } else {
+        if (e instanceof PostgresError) {
+          throw new TransactionError(this.name, e);
+        }
+        throw e;
       }
-      throw e;
     }
 
     this.#updateClientLock(this.name);
