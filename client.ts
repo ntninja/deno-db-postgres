@@ -268,7 +268,18 @@ export abstract class QueryClient {
     _query: Query<ResultType.OBJECT>,
   ): Promise<QueryObjectResult<T>>;
   async #executeQuery(query: Query<ResultType>): Promise<QueryResult> {
-    return await this.#connection.query(query);
+    try {
+      return await this.#connection.query(query);
+    } catch (e) {
+      if (e instanceof Deno.errors.BrokenPipe) {
+        // Retry once with fresh connection, if connection was dropped by server since last query
+        await this.closeConnection();
+        await this.connect();
+        return await this.#connection.query(query);
+      } else {
+        throw e;
+      }
+    }
   }
 
   /**
