@@ -609,13 +609,13 @@ Deno.test(
   "Handles parameter status messages on array query",
   withClient(async (client) => {
     const { rows: result_1 } = await client
-      .queryArray`SET TIME ZONE 'HongKong'`;
+      .queryArray`SET TIME ZONE 'Asia/Hong_Kong'`;
 
     assertEquals(result_1, []);
 
     const { rows: result_2 } = await client.queryObject({
       fields: ["result"],
-      text: "SET TIME ZONE 'HongKong'; SELECT 1",
+      text: "SET TIME ZONE 'Asia/Hong_Kong'; SELECT 1",
     });
 
     assertEquals(result_2, [{ result: 1 }]);
@@ -630,7 +630,7 @@ Deno.test(
     await client
       .queryArray`CREATE OR REPLACE FUNCTION PG_TEMP.CHANGE_TIMEZONE(RES INTEGER) RETURNS INT AS $$
 			BEGIN
-			SET TIME ZONE 'HongKong';
+			SET TIME ZONE 'Asia/Hong_Kong';
 			END;
 			$$ LANGUAGE PLPGSQL;`;
 
@@ -646,7 +646,7 @@ Deno.test(
     await client
       .queryArray`CREATE OR REPLACE FUNCTION PG_TEMP.CHANGE_TIMEZONE(RES INTEGER) RETURNS INT AS $$
 			BEGIN
-			SET TIME ZONE 'HongKong';
+			SET TIME ZONE 'Asia/Hong_Kong';
 			RETURN RES;
 			END;
 			$$ LANGUAGE PLPGSQL;`;
@@ -667,7 +667,7 @@ Deno.test(
     await client
       .queryArray`CREATE OR REPLACE FUNCTION PG_TEMP.CHANGE_TIMEZONE() RETURNS INT AS $$
 			BEGIN
-			SET TIME ZONE 'HongKong';
+			SET TIME ZONE 'Asia/Hong_Kong';
 			END;
 			$$ LANGUAGE PLPGSQL;`;
 
