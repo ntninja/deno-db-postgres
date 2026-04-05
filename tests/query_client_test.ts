@@ -12,8 +12,8 @@ import {
   assertObjectMatch,
   assertRejects,
   assertThrows,
-} from "jsr:@std/assert@1.0.10";
-import { MockError, stub } from "jsr:@std/testing/mock";
+} from "@std/assert";
+import { MockError, stub } from "@std/testing/mock";
 import { getMainConfiguration } from "./config.ts";
 import type { PoolClient, QueryClient } from "../client.ts";
 import type { ClientOptions } from "../connection/connection_params.ts";
